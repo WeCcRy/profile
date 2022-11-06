@@ -28,7 +28,7 @@
     </a-row>
     </a-layout-head>
     <a-layout-content style="margin: 0 16px">
-      <a-table :columns="columns" :data-source="year=='2021'?data2021:data2022" :pagination="false" rowKey="key">
+      <a-table :columns="columns" :data-source="bookList" :pagination="false" rowKey="key">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'name'">
             <a>
@@ -108,9 +108,9 @@
       </a-form>
       <a-card style="width: 190px;margin:auto" v-if="isChecked" >
         <template #cover>
-          <img :src="bookAddDetail.imgUrl" style="width: 190px;height: 263px" alt="加载中..."/>
+          <img :src="bookAddDetail.photoUrl" style="width: 190px;height: 263px" alt="加载中..."/>
         </template>
-        <a-card-meta :title="bookAddDetail.Title">
+        <a-card-meta :title="bookAddDetail.title">
           <template #description>{{ bookAddDetail.Author }}</template>
         </a-card-meta>
       </a-card>
@@ -127,8 +127,6 @@ import { DownOutlined,SmileTwoTone,PlusOutlined } from '@ant-design/icons-vue';
 import { message } from 'ant-design-vue';
 import {defineComponent, ref, watch, reactive, toRaw} from 'vue';
 import axios from 'axios'
-import booklist2021 from '../assets/book2021'
-import booklist2022 from '../assets/book2022'
 const columns = [
   {
     title:"排名",
@@ -184,10 +182,6 @@ const columns = [
     sorter: (a, b) => a.rate - b.rate,
   },
 ];
-
-const data2021 = booklist2021
-let data2022 = booklist2022
-
 export default defineComponent({
   components: {
     DownOutlined,
@@ -196,6 +190,7 @@ export default defineComponent({
   },
   setup() {
     let year=ref("2022")
+    let bookList=ref([])
     let bookDetail=ref("")
     let isLoading=ref(true)
     let photoUrl=ref("")
@@ -226,9 +221,10 @@ export default defineComponent({
     });
     let bookAddDetail=reactive({
       ISBN:'',
-      imgUrl:'',
-      Title:'',
-      Author:'',
+      title:'',
+      author:'',
+      photoUrl:'',
+      description:'',
     })
     const onSubmit = () => {
       console.log('submit!', addBookInfo);
@@ -253,9 +249,6 @@ export default defineComponent({
     }
     const showModal = () => {
       formVisible.value = true;
-      data2022.forEach(ele=>{
-        ISBNArray.push(ele.ISBN)
-      })
     };
     const bookClear=()=>{
       addBookInfo.ISBN=''
@@ -271,23 +264,49 @@ export default defineComponent({
     const handleOk = () => {
       console.log(toRaw(addBookInfo));
       let flag=0
-      ISBNArray.forEach(ele=>{
+      ISBNArray.forEach((ele)=>{
         if(ele==addBookInfo.ISBN&&flag==0){
           flag=1
         }
       })
       if(flag==1){
         message.error("该ISBN已存在")
-      }else{
-        message.success("添加成功")
-        formVisible.value=false
+      }
+      else{
+        axios.post('http://127.0.0.1/addBook',{
+          title:bookAddDetail.title,
+          author:bookAddDetail.author,
+          photoUrl:bookAddDetail.photoUrl,
+          description:bookAddDetail.description,
+          ISBN:addBookInfo.ISBN,
+          bookRate:addBookInfo.bookRate,
+          isFiction:addBookInfo.isFiction==1?"小说":"非小说",
+          type:addBookInfo.type
+        })
+            .then((res)=>{
+              if(res.status==200){
+                message.success("添加成功")
+                formVisible.value=false
+                getBookList(year)
+              }
+            }).catch(err=>{
+          console.log(err);
+        })
       }
     };
     const onFinish = values => {
       isChecked.value=true
       getDetailsAdd(values.ISBN)
-      console.log('Success:', values);
     };
+    const getBookList=year=>{
+      axios.get(`http://127.0.0.1/booklist?year=${year.value}`)
+          .then(res=>{
+            bookList.value=res.data.data
+            ISBNArray=res.data.ISBN
+          }).catch(err=>{
+        console.log(err);
+      })
+    }
     function getDetails(ISBN){
       isLoading.value=true
       bookDetail.value=""
@@ -309,9 +328,10 @@ export default defineComponent({
           .then(res=>{
             console.log(res.data.data)
             let data=res.data.data
-            bookAddDetail.imgUrl='https://images.weserv.nl/?url='+data.photoUrl
-            bookAddDetail.Author= data.author
-            bookAddDetail.Title=data.name
+            bookAddDetail.photoUrl='https://images.weserv.nl/?url='+data.photoUrl
+            bookAddDetail.author= data.author
+            bookAddDetail.title=data.name
+            bookAddDetail.description=data.description
           }).catch(err=>{
         console.log(err);
       })
@@ -342,6 +362,7 @@ export default defineComponent({
       }
     }
     watch(year,(n,o)=>{
+      getBookList(year)
       message.success("已为你切换至"+n+"年")
     })
     watch(isChecked,()=>{
@@ -359,9 +380,11 @@ export default defineComponent({
         bookRateVShow.value=intRate
       }
     })
+    getBookList(year)
     return {
       handleMenuClick,
       getDetails,
+      bookList,
       drawerVisible,
       formVisible,
       pStyle,
@@ -378,11 +401,9 @@ export default defineComponent({
       showModal,
       handleCancel,
       handleOk,
-      getDetailsAdd,
+      getBookList,
       onSubmit,
       onFinish,
-      data2021,
-      data2022,
       isLoading,
       bookDetail,
       photoUrl,
