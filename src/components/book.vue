@@ -3,7 +3,13 @@
     <a-layout-head style="padding: 16px 10px 0 16px">
       <a-row type="flex" justify="space-around" align="middle">
       <!--      style="text-align: left;font-weight: bold;margin-left: 15px"-->
-      <a-col :span="2"><a-typography-title :level="2">{{year}}<SmileTwoTone twoToneColor="#002FA7" style="margin-left: 15px"/></a-typography-title></a-col>
+      <a-col :span="2">
+        <a-typography-title :level="2">{{year}}
+<!--          Pantone年度色！-->
+          <SmileTwoTone v-if="year=='2021'" twoToneColor="#F5DF4D" style="margin-left: 15px"/>
+          <SmileTwoTone v-if="year=='2022'" twoToneColor="#6667AB" style="margin-left: 15px"/>
+        </a-typography-title>
+      </a-col>
       <a-col :span="1" style="margin-bottom: 15px">
         <a-dropdown>
           <template #overlay>
@@ -31,11 +37,11 @@
       <a-table :columns="columns" :data-source="bookList" :pagination="false" rowKey="key">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'name'">
-            <a>
-              <a-popover :title="record.name" placement="bottom" @mouseenter="getDetails(record.ISBN)">
+            <a :href="'https://book.douban.com/subject/'+record.douban" target="_blank">
+              <a-popover :title="record.name" placement="bottom" @mouseenter="getDetails(record)">
                 <template #content >
-                  <p v-if="isLoading">加载中...</p>
-                  <img :src="'https://images.weserv.nl/?url='+photoUrl" style="width: 81px;height: 117px;float: left" alt="图片加载中...">
+<!--                  <p v-if="isLoading">加载中...</p>-->
+                  <img :src="'https://images.weserv.nl/?url='+record.photoUrl" style="width: 81px;height: 117px;float: left" alt="图片加载中...">
                   <div style="float: left;width: 250px;padding-left: 10px" >{{bookDetail}}</div>
                   <div style="clear:both"></div>
                 </template>
@@ -54,18 +60,18 @@
           </a-tag>
         </span>
           </template>
-          <!--      <template v-else-if="column.key === 'action'">-->
-          <!--        <span>-->
-          <!--          <a>Invite 一 {{ record.name }}</a>-->
-          <!--          <a-divider type="vertical" />-->
-          <!--          <a>Delete</a>-->
-          <!--          <a-divider type="vertical" />-->
-          <!--          <a class="ant-dropdown-link">-->
-          <!--            More actions-->
-          <!--            <down-outlined />-->
-          <!--          </a>-->
-          <!--        </span>-->
-          <!--      </template>-->
+<!--                <template v-else-if="column.key === 'action'">-->
+<!--                  <span>-->
+<!--                    <a>Invite 一 {{ record.name }}</a>-->
+<!--                    <a-divider type="vertical" />-->
+<!--                    <a>Delete</a>-->
+<!--                    <a-divider type="vertical" />-->
+<!--                    <a class="ant-dropdown-link">-->
+<!--                      More actions-->
+<!--                      <down-outlined />-->
+<!--                    </a>-->
+<!--                  </span>-->
+<!--                </template>-->
         </template>
       </a-table>
     </a-layout-content>
@@ -111,7 +117,7 @@
           <img :src="bookAddDetail.photoUrl" style="width: 190px;height: 263px" alt="加载中..."/>
         </template>
         <a-card-meta :title="bookAddDetail.title">
-          <template #description>{{ bookAddDetail.Author }}</template>
+          <template #description>{{ bookAddDetail.author }}</template>
         </a-card-meta>
       </a-card>
       <template #footer>
@@ -125,7 +131,7 @@
 
 import { DownOutlined,SmileTwoTone,PlusOutlined } from '@ant-design/icons-vue';
 import { message } from 'ant-design-vue';
-import {defineComponent, ref, watch, reactive, toRaw} from 'vue';
+import {defineComponent, ref, watch, reactive, toRaw,computed} from 'vue';
 import axios from 'axios'
 const columns = [
   {
@@ -152,6 +158,11 @@ const columns = [
     key: 'tags',
     dataIndex: 'tags',
   },
+  // {
+  //   title:'action',
+  //   key:'action',
+  //   dataIndex: 'action'
+  // },
   {
     title: '评分',
     key: 'rate',
@@ -192,7 +203,6 @@ export default defineComponent({
     let year=ref("2022")
     let bookList=ref([])
     let bookDetail=ref("")
-    let isLoading=ref(true)
     let photoUrl=ref("")
     //https://jike.xyz/jiekou/isbn.html#%E8%BF%94%E5%9B%9E%E5%8F%82%E6%95%B0%E8%AF%B4%E6%98%8E
     //私人接口APIKEY，如无法获得数据，需手动更改
@@ -225,6 +235,7 @@ export default defineComponent({
       author:'',
       photoUrl:'',
       description:'',
+      douban:''
     })
     const onSubmit = () => {
       console.log('submit!', addBookInfo);
@@ -278,10 +289,11 @@ export default defineComponent({
           author:bookAddDetail.author,
           photoUrl:bookAddDetail.photoUrl,
           description:bookAddDetail.description,
+          douban:bookAddDetail.douban,
           ISBN:addBookInfo.ISBN,
           bookRate:addBookInfo.bookRate,
           isFiction:addBookInfo.isFiction==1?"小说":"非小说",
-          type:addBookInfo.type
+          type:addBookInfo.type,
         })
             .then((res)=>{
               if(res.status==200){
@@ -307,21 +319,13 @@ export default defineComponent({
         console.log(err);
       })
     }
-    function getDetails(ISBN){
-      isLoading.value=true
+    function getDetails(record){
       bookDetail.value=""
-      photoUrl.value=""
-      axios.get(`https://api.jike.xyz/situ/book/isbn/${ISBN}?apikey=${apikey}`)
-          .then(res=>{
-            let data=res.data.data
-            isLoading.value=false
-            if(data.description.length>100) {
-              bookDetail.value = data.description.slice(0,100)+"..."
-            }
-            photoUrl.value=data.photoUrl
-          }).catch(err=>{
-        console.log(err);
-      })
+      if(record.description.length>100){
+        bookDetail.value=record.description.substr(0,100)+"..."
+      }else{
+        bookDetail.value=record.description
+      }
     }
     function getDetailsAdd(ISBN){
       axios.get(`https://api.jike.xyz/situ/book/isbn/${ISBN}?apikey=${apikey}`)
@@ -346,7 +350,7 @@ export default defineComponent({
           return 'gold'
         case "纪实":
           return 'orange'
-        case "非纪实":
+        case "传记":
           return 'cyan'
         case "社会":
           return 'lime'
@@ -404,7 +408,6 @@ export default defineComponent({
       getBookList,
       onSubmit,
       onFinish,
-      isLoading,
       bookDetail,
       photoUrl,
       year,
