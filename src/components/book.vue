@@ -27,7 +27,7 @@
       <a-col :span="18"></a-col>
       <a-col :span="2"><a-button type="link" @click="showDrawer">我的图书报告</a-button></a-col>
       <a-col :span="1">
-        <a-button v-if="year==2022" type="primary" size="small" @click="showModal">
+        <a-button v-if="year==2022" type="primary" size="small" @click="showModal('add')">
           <template #icon><plus-outlined /></template>
         </a-button>
       </a-col>
@@ -60,18 +60,13 @@
           </a-tag>
         </span>
           </template>
-<!--                <template v-else-if="column.key === 'action'">-->
-<!--                  <span>-->
-<!--                    <a>Invite 一 {{ record.name }}</a>-->
-<!--                    <a-divider type="vertical" />-->
-<!--                    <a>Delete</a>-->
-<!--                    <a-divider type="vertical" />-->
-<!--                    <a class="ant-dropdown-link">-->
-<!--                      More actions-->
-<!--                      <down-outlined />-->
-<!--                    </a>-->
-<!--                  </span>-->
-<!--                </template>-->
+                <template v-else-if="column.key === 'action'" >
+                  <div>
+                    <a style="width: 50%" @click="showModal('edit',record)">修改</a>
+                    <a-divider type="vertical" />
+                    <a style="width: 50%">删除</a>
+                  </div>
+                </template>
         </template>
       </a-table>
     </a-layout-content>
@@ -85,10 +80,10 @@
       </a-col>
     </a-row>
   </a-drawer>
-    <a-modal v-model:visible="formVisible" title="添加图书" @ok="handleOk">
+    <a-modal v-model:visible="formVisible" :title="!modalEditable?'图书添加':'图书修改'" @ok="handleOk" style="width: 560px">
       <a-form :model="addBookInfo" @finish="onFinish">
         <a-form-item name="ISBN" label="ISBN" has-feedback required :rules="[{type: 'string', min: 13, max: 13 ,message:'请输入13位ISBN码'}]">
-          <a-input v-model:value="addBookInfo.ISBN" />
+          <a-input v-model:value="addBookInfo.ISBN" :disabled="modalEditable"/>
         </a-form-item>
         <a-form-item name="isFiction" label="小说(是/否)">
           <a-switch v-model:checked="addBookInfo.isFiction" />
@@ -101,20 +96,24 @@
             <a-checkbox value="社会" name="type">社会</a-checkbox>
             <a-checkbox value="科幻" name="type">科幻</a-checkbox>
             <a-checkbox value="哲学" name="type">哲学</a-checkbox>
+            <a-checkbox value="传记" name="type">传记</a-checkbox>
           </a-checkbox-group>
+        </a-form-item>
+        <a-form-item name="feature" label="专属标签">
+          <a-input v-model:value="addBookInfo.feature" />
         </a-form-item>
         <a-form-item name="bookRate" label="评分">
           <a-input-number v-model:value="addBookInfo.bookRate" :min="0" :max="5" :precision="2" :step="0.1"/>
           <a-rate :value="bookRateVShow" allow-half disabled style="margin-left: 20px"/>
         </a-form-item>
-        <a-form-item :wrapper-col="{ span: 14, offset: 7 }">
+        <a-form-item :wrapper-col="{ span: 14, offset: 7 }" v-if="!modalEditable">
           <a-button @click="bookClear">清空</a-button>
           <a-button type="primary" html-type="submit" style="margin-left: 10px">查看详细信息</a-button>
         </a-form-item>
       </a-form>
       <a-card style="width: 190px;margin:auto" v-if="isChecked" >
         <template #cover>
-          <img :src="bookAddDetail.photoUrl" style="width: 190px;height: 263px" alt="加载中..."/>
+          <img :src="'https://images.weserv.nl/?url='+bookAddDetail.photoUrl" style="width: 190px;height: 263px" alt="加载中..."/>
         </template>
         <a-card-meta :title="bookAddDetail.title">
           <template #description>{{ bookAddDetail.author }}</template>
@@ -138,6 +137,7 @@ const columns = [
     title:"排名",
     dataIndex: "index",
     key:"index",
+    width: '5%',
     customRender:(text)=> {
       return parseInt(text.index)+1
     }
@@ -147,26 +147,25 @@ const columns = [
     name: 'Name',
     dataIndex: 'name',
     key: 'name',
+    width: '25%',
   },
   {
     title: '作者',
     dataIndex: 'editor',
     key: 'editor',
+    width: '20%',
   },
   {
     title: '标签',
     key: 'tags',
     dataIndex: 'tags',
+    width: '33%',
   },
-  // {
-  //   title:'action',
-  //   key:'action',
-  //   dataIndex: 'action'
-  // },
   {
     title: '评分',
     key: 'rate',
     dataIndex:'rate',
+    width: '10%',
     customRender:(text)=> {
       const rate=parseFloat(text.value)
       let x=parseInt(rate)
@@ -192,6 +191,12 @@ const columns = [
     defaultSortOrder: 'descend',
     sorter: (a, b) => a.rate - b.rate,
   },
+  {
+    title:'操作',
+    key:'action',
+    dataIndex: 'action',
+    width: '7%',
+  },
 ];
 export default defineComponent({
   components: {
@@ -209,9 +214,10 @@ export default defineComponent({
     const apikey="13294.206eaa07ed2ea8b374cf076241a2024c.f57bd57f2303f9557c040b0365744e1c"
     const drawerVisible = ref(false)
     const formVisible = ref(false)
+    let modalEditable=ref(false)
     let ISBNArray=[]
     let isChecked=ref(false)
-    let bookRateVShow=ref(3)
+    let bookRateVShow=ref(0)
     let bookAddConfirm=ref("请先查看书本详细信息")
     const pStyle = {
       fontSize: '16px',
@@ -227,7 +233,8 @@ export default defineComponent({
       ISBN: '',
       isFiction: true,
       type: [],
-      bookRate: 3,
+      bookRate: 0,
+      feature:"",
     });
     let bookAddDetail=reactive({
       ISBN:'',
@@ -258,8 +265,27 @@ export default defineComponent({
     const handleMenuClick=(e)=>{
       year.value=e.key
     }
-    const showModal = () => {
+    const showModal = (status,record) => {
       formVisible.value = true;
+      if(status=="edit"){
+        modalEditable.value=true
+        isChecked.value=true
+        let isFiction=record.tags[0]
+        let type=record.tags.slice(1,-1)
+        let feature=record.tags[record.tags.length-1]
+        addBookInfo.ISBN=record.ISBN
+        addBookInfo.isFiction=isFiction=='小说'
+        addBookInfo.type=type
+        addBookInfo.feature=feature
+        addBookInfo.bookRate=record.rate
+        bookAddDetail.photoUrl=record.photoUrl
+        bookAddDetail.title=record.name
+        bookAddDetail.author=record.editor
+      }else{
+        modalEditable.value=false
+        isChecked.value=false
+        bookClear()
+      }
     };
     const bookClear=()=>{
       addBookInfo.ISBN=''
@@ -273,37 +299,62 @@ export default defineComponent({
       formVisible.value = false;
     };
     const handleOk = () => {
-      console.log(toRaw(addBookInfo));
-      let flag=0
-      ISBNArray.forEach((ele)=>{
-        if(ele==addBookInfo.ISBN&&flag==0){
-          flag=1
-        }
-      })
-      if(flag==1){
-        message.error("该ISBN已存在")
-      }
-      else{
-        axios.post('http://127.0.0.1/addBook',{
-          title:bookAddDetail.title,
-          author:bookAddDetail.author,
-          photoUrl:bookAddDetail.photoUrl,
-          description:bookAddDetail.description,
-          douban:bookAddDetail.douban,
+      //通过modalEditable来判断是编辑图书还是添加图书,1编辑，0添加
+      if(modalEditable.value){
+        axios.post(`http://127.0.0.1/editBook?year=${year.value}`,{
+          // title:bookAddDetail.title,
+          // author:bookAddDetail.author,
+          // photoUrl:bookAddDetail.photoUrl,
+          // description:bookAddDetail.description,
+          // douban:bookAddDetail.douban,
           ISBN:addBookInfo.ISBN,
           bookRate:addBookInfo.bookRate,
           isFiction:addBookInfo.isFiction==1?"小说":"非小说",
           type:addBookInfo.type,
+          feature:addBookInfo.feature,
         })
             .then((res)=>{
               if(res.status==200){
-                message.success("添加成功")
+                message.success("修改成功")
                 formVisible.value=false
                 getBookList(year)
               }
             }).catch(err=>{
           console.log(err);
         })
+      }else{
+        let flag=0
+        ISBNArray.forEach((ele)=>{
+          if(ele==addBookInfo.ISBN&&flag==0){
+            flag=1
+          }
+        })
+        if(flag==1){
+          message.error("该ISBN已存在")
+        }
+        else{
+          axios.post('http://127.0.0.1/addBook',{
+            title:bookAddDetail.title,
+            author:bookAddDetail.author,
+            photoUrl:bookAddDetail.photoUrl,
+            description:bookAddDetail.description,
+            douban:bookAddDetail.douban,
+            ISBN:addBookInfo.ISBN,
+            bookRate:addBookInfo.bookRate,
+            isFiction:addBookInfo.isFiction==1?"小说":"非小说",
+            type:addBookInfo.type,
+            feature:addBookInfo.feature,
+          })
+              .then((res)=>{
+                if(res.status==200){
+                  message.success("添加成功")
+                  formVisible.value=false
+                  getBookList(year)
+                }
+              }).catch(err=>{
+            console.log(err);
+          })
+        }
       }
     };
     const onFinish = values => {
@@ -332,10 +383,12 @@ export default defineComponent({
           .then(res=>{
             console.log(res.data.data)
             let data=res.data.data
-            bookAddDetail.photoUrl='https://images.weserv.nl/?url='+data.photoUrl
+            // bookAddDetail.photoUrl='https://images.weserv.nl/?url='+data.photoUrl
+            bookAddDetail.photoUrl=data.photoUrl
             bookAddDetail.author= data.author
             bookAddDetail.title=data.name
             bookAddDetail.description=data.description
+            bookAddDetail.douban=data.douban
           }).catch(err=>{
         console.log(err);
       })
@@ -391,6 +444,7 @@ export default defineComponent({
       bookList,
       drawerVisible,
       formVisible,
+      modalEditable,
       pStyle,
       pStyle2,
       addBookInfo,
