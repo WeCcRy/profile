@@ -64,7 +64,7 @@
                   <div>
                     <a style="width: 50%" @click="showModal('edit',record)">修改</a>
                     <a-divider type="vertical" />
-                    <a style="width: 50%">删除</a>
+                    <a style="width: 50%" @click="handleDelete(record.ISBN)">删除</a>
                   </div>
                 </template>
         </template>
@@ -271,8 +271,20 @@ export default defineComponent({
         modalEditable.value=true
         isChecked.value=true
         let isFiction=record.tags[0]
-        let type=record.tags.slice(1,-1)
         let feature=record.tags[record.tags.length-1]
+        // 下下策，上策为统一前后台数据形式
+        let tagList=["小说","推理","历史","纪实","社会","科幻","哲学","传记"]
+        tagList.forEach(ele=>{
+          if(ele==feature){
+            feature=""
+          }
+        })
+        let type=[]
+        if(feature==""){
+          type=record.tags.slice(1)
+        }else{
+          type=record.tags.slice(1,-1)
+        }
         addBookInfo.ISBN=record.ISBN
         addBookInfo.isFiction=isFiction=='小说'
         addBookInfo.type=type
@@ -393,6 +405,17 @@ export default defineComponent({
         console.log(err);
       })
     }
+    function handleDelete(ISBN){
+      axios.get(`http://127.0.0.1/deleteBook?year=${year.value}&ISBN=${ISBN}`)
+          .then((res)=>{
+            if(res.status==200){
+              message.success("删除成功")
+              getBookList(year)
+            }
+          }).catch(err=>{
+        console.log(err);
+      })
+    }
     const color=(name)=>{
       switch (name){
         case "小说":
@@ -462,6 +485,7 @@ export default defineComponent({
       getBookList,
       onSubmit,
       onFinish,
+      handleDelete,
       bookDetail,
       photoUrl,
       year,

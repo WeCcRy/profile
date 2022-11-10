@@ -16,7 +16,6 @@
 import book from './components/book.vue'
 import navLeft from './components/nav'
 import homepage from "@/components/homepage";
-import contact from "@/components/contact";
 import {ref} from "vue";
 export default {
   name: 'App',
@@ -24,7 +23,6 @@ export default {
     navLeft,
     book,
     homepage,
-    contact,
   },
   setup(){
     let isShow=ref('2')
