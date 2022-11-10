@@ -2,7 +2,6 @@
   <a-layout>
     <a-layout-head style="padding: 16px 10px 0 16px">
       <a-row type="flex" justify="space-around" align="middle">
-      <!--      style="text-align: left;font-weight: bold;margin-left: 15px"-->
       <a-col :span="2">
         <a-typography-title :level="2">{{year}}
 <!--          Pantone年度色！-->
@@ -64,15 +63,15 @@
                   <div>
                     <a style="width: 50%" @click="showModal('edit',record)">修改</a>
                     <a-divider type="vertical" />
-                    <a style="width: 50%" @click="handleDelete(record.ISBN)">删除</a>
+                    <a style="width: 50%" @click="handleDelete(record)">删除</a>
                   </div>
                 </template>
         </template>
       </a-table>
     </a-layout-content>
   <a-drawer width="640" placement="right" :closable="false" :visible="drawerVisible" @close="onClose">
-    <p :style="[pStyle, pStyle2]">我的{{year}}</p>
-    <p :style="pStyle">Personal</p>
+    <p class="drawerText">我的{{year}}</p>
+    <p class="drawerText">Personal</p>
     <a-row>
       <a-col :span="12">
       </a-col>
@@ -128,9 +127,9 @@
 </template>
 <script>
 
-import { DownOutlined,SmileTwoTone,PlusOutlined } from '@ant-design/icons-vue';
-import { message } from 'ant-design-vue';
-import {defineComponent, ref, watch, reactive, toRaw,computed} from 'vue';
+import { DownOutlined,SmileTwoTone,PlusOutlined,ExclamationCircleOutlined  } from '@ant-design/icons-vue';
+import { message,Modal } from 'ant-design-vue';
+import {defineComponent, ref, watch, reactive,createVNode} from 'vue';
 import axios from 'axios'
 const columns = [
   {
@@ -219,16 +218,6 @@ export default defineComponent({
     let isChecked=ref(false)
     let bookRateVShow=ref(0)
     let bookAddConfirm=ref("请先查看书本详细信息")
-    const pStyle = {
-      fontSize: '16px',
-      color: 'rgba(0,0,0,0.85)',
-      lineHeight: '24px',
-      display: 'block',
-      marginBottom: '16px',
-    };
-    const pStyle2 = {
-      marginBottom: '24px',
-    };
     let addBookInfo = reactive({
       ISBN: '',
       isFiction: true,
@@ -244,9 +233,6 @@ export default defineComponent({
       description:'',
       douban:''
     })
-    const onSubmit = () => {
-      console.log('submit!', addBookInfo);
-    };
     //通用清空方法
     const objClear=(obj)=>{
       Object.keys(obj).map(key=>{
@@ -258,9 +244,6 @@ export default defineComponent({
     };
     const onClose = () => {
       drawerVisible.value = false;
-    };
-    const success = () => {
-      message.success('This is a success message');
     };
     const handleMenuClick=(e)=>{
       year.value=e.key
@@ -300,12 +283,11 @@ export default defineComponent({
       }
     };
     const bookClear=()=>{
-      addBookInfo.ISBN=''
-      addBookInfo.bookRate=0
-      addBookInfo.isFiction=true
-      addBookInfo.type=[]
       isChecked.value=false
       objClear(bookAddDetail)
+      objClear(addBookInfo)
+      addBookInfo.isFiction=true
+      addBookInfo.bookRate=0
     }
     const handleCancel = () => {
       formVisible.value = false;
@@ -382,7 +364,7 @@ export default defineComponent({
         console.log(err);
       })
     }
-    function getDetails(record){
+    const getDetails=(record)=>{
       bookDetail.value=""
       if(record.description.length>100){
         bookDetail.value=record.description.substr(0,100)+"..."
@@ -390,12 +372,10 @@ export default defineComponent({
         bookDetail.value=record.description
       }
     }
-    function getDetailsAdd(ISBN){
+    const getDetailsAdd=(ISBN)=>{
       axios.get(`https://api.jike.xyz/situ/book/isbn/${ISBN}?apikey=${apikey}`)
           .then(res=>{
-            console.log(res.data.data)
             let data=res.data.data
-            // bookAddDetail.photoUrl='https://images.weserv.nl/?url='+data.photoUrl
             bookAddDetail.photoUrl=data.photoUrl
             bookAddDetail.author= data.author
             bookAddDetail.title=data.name
@@ -405,16 +385,25 @@ export default defineComponent({
         console.log(err);
       })
     }
-    function handleDelete(ISBN){
-      axios.get(`http://127.0.0.1/deleteBook?year=${year.value}&ISBN=${ISBN}`)
-          .then((res)=>{
-            if(res.status==200){
-              message.success("删除成功")
-              getBookList(year)
-            }
-          }).catch(err=>{
-        console.log(err);
-      })
+    const handleDelete=(record)=>{
+      Modal.confirm({
+        title: "你确定要删除《"+record.name+"》么？",
+        icon: createVNode(ExclamationCircleOutlined),
+        okText: '确定',
+        okType: 'danger',
+        cancelText: '取消',
+        onOk() {
+          axios.get(`http://127.0.0.1/deleteBook?year=${year.value}&ISBN=${record.ISBN}`)
+              .then((res)=>{
+                if(res.status==200){
+                  message.success("删除成功")
+                  getBookList(year)
+                }
+              }).catch(err=>{
+            console.log(err);
+          })
+        }
+      });
     }
     const color=(name)=>{
       switch (name){
@@ -462,36 +451,41 @@ export default defineComponent({
     })
     getBookList(year)
     return {
-      handleMenuClick,
-      getDetails,
       bookList,
       drawerVisible,
       formVisible,
       modalEditable,
-      pStyle,
-      pStyle2,
       addBookInfo,
       isChecked,
       bookRateVShow,
       bookAddConfirm,
       bookAddDetail,
-      bookClear,
-      showDrawer,
-      onClose,
-      success,
-      showModal,
-      handleCancel,
-      handleOk,
-      getBookList,
-      onSubmit,
-      onFinish,
-      handleDelete,
       bookDetail,
       photoUrl,
       year,
       columns,
+      handleMenuClick,
+      getDetails,
+      bookClear,
+      showDrawer,
+      onClose,
+      showModal,
+      handleCancel,
+      handleOk,
+      getBookList,
+      onFinish,
+      handleDelete,
       color,
     };
   },
 });
 </script>
+<style>
+  .drawerText{
+    font-size: 16px;
+    color: rgba(0,0,0,0.8);
+    line-height: 24px;
+    display: block;
+    margin-bottom: 16px;
+  }
+</style>
